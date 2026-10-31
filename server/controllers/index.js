@@ -2,7 +2,7 @@
 const models = require('../models');
 
 // get the Cat model
-const { Cat } = models;
+const { Cat, Dog } = models;
 
 // Function to handle rendering the index page.
 const hostIndex = async (req, res) => {
@@ -100,6 +100,17 @@ const hostPage3 = (req, res) => {
   res.render('page3');
 };
 
+const hostPage4 = async (req, res) => {
+  try {
+    const docs = await Dog.find({}).lean().exec()
+
+    return res.render('page4', { dogs: docs })
+  } catch (err) {
+      console.log(err);
+    return res.status(500).json({ error: 'failed to find dogs' });
+  }
+}
+
 // Get name will return the name of the last added cat.
 const getName = async (req, res) => {
   try{
@@ -184,6 +195,51 @@ const setName = async (req, res) => {
     return res.status(500).json({ error: 'failed to create cat' });
   }
 };
+
+const addDog = async (req, res) => {
+  if (!req.body.name || !req.body.breed || !req.body.age) {
+    return res.status(400).json({ error: 'name, breed, and age are all required' });
+  }
+
+  const dogData = {
+    name: req.body.name,
+    breed: req.body.breed,
+    age: req.body.age
+  }
+
+  const newDog = new Dog(dogData)
+
+  try {
+    await newDog.save()
+    return res.status(201).json(dogData)
+  } catch (err) {
+    console.log(err)
+    return res.status(500).json({ error: 'failed to create dog' });
+  }
+}
+
+const ageDog = async (req, res) => {
+  if (!req.query.name) {
+    return res.status(400).json({ error: 'Name is required to perform a search' });
+  }
+
+  const updatePromise = Dog.findOneAndUpdate({ name: req.query.name }, {$inc: {age: 1}}, {
+    returnDocument: 'after', //Populates doc in the .then() with the version after update
+    sort: {'createdDate': 'descending'}
+  }).lean().exec();
+  
+  updatePromise.then((doc) => res.json({
+    name: doc.name,
+    breed: doc.breed,
+    age: doc.age
+  }));
+
+  // If something goes wrong saving to the database, log the error and send a message to the client.
+  updatePromise.catch((err) => {
+    console.log(err);
+    return res.status(500).json({ error: 'Something went wrong' });
+  });
+}
 
 // Function to handle searching a cat by name.
 const searchName = async (req, res) => {
@@ -289,9 +345,12 @@ module.exports = {
   page1: hostPage1,
   page2: hostPage2,
   page3: hostPage3,
+  page4: hostPage4,
   getName,
   setName,
   updateLast,
   searchName,
   notFound,
+  addDog,
+  ageDog
 };
